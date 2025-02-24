@@ -21,7 +21,6 @@ use TYPO3\CMS\Core\EventDispatcher\EventDispatcher;
 use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\Index\ExtractorInterface;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extbase\Persistence\PersistenceManagerInterface;
 
 class Extractor implements ExtractorInterface
 {
@@ -119,7 +118,6 @@ class Extractor implements ExtractorInterface
             }
             //$metadataObjects[] = $metadata['uid'];
         }
-
         $array_filedata = [
             'width' => (int)($fileData['width'] ?? 0),
             'height' => (int)($fileData['height'] ?? 0),
@@ -132,18 +130,11 @@ class Extractor implements ExtractorInterface
         if (isset($fileData['default']['Pages'])) {
             $array_filedata['pages'] = $fileData['default']['Pages'];
         }
-        //Refresh sizes after append(for first add a new canto image, before call main filetree in site menu)
-        $file->updateProperties($array_filedata);
-        $persistenceManager = GeneralUtility::makeInstance(PersistenceManagerInterface::class);
-        $metaData = $file->getMetaData();
-        $metaData->add($array_filedata);
-        $metaData->save();
-        $persistenceManager->persistAll();
 
-        return array_replace(
-            [
-                $array_filedata
-            ],
+        return array_map(
+            function ($metaData) use ($array_filedata) {
+                return array_replace($array_filedata, $metaData);
+            },
             $metadata
         );
     }
