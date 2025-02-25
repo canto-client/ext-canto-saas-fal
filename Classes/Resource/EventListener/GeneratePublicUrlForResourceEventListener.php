@@ -11,9 +11,8 @@ declare(strict_types=1);
 
 namespace Fairway\CantoSaasFal\Resource\EventListener;
 
-use Fairway\CantoSaasFal\Utility\CantoUtility;
+use Fairway\CantoSaasFal\Resource\Driver\CantoDriver;
 use TYPO3\CMS\Core\Resource\Event\GeneratePublicUrlForResourceEvent;
-use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\ProcessedFile;
 
 final class GeneratePublicUrlForResourceEventListener
@@ -21,24 +20,18 @@ final class GeneratePublicUrlForResourceEventListener
     public function __invoke(GeneratePublicUrlForResourceEvent $event): void
     {
         $file = $event->getResource();
-        $identifier = null;
-        if ($file instanceof File) {
-            $identifier = $file->getIdentifier();
-        }
         if ($file instanceof ProcessedFile) {
-            $identifier = $file->getOriginalFile()->getIdentifier();
+            $file = $file->getOriginalFile();
         }
-        if (!$identifier) {
+        if ($file->getStorage()->getDriverType() !== CantoDriver::DRIVER_NAME) {
             return;
         }
         try {
-            if (CantoUtility::isMdcActivated($event->getStorage()->getConfiguration())) {
-                // This applies a public url for the given asset.
-                // If the file has been registered as a mdc-asset, then this returns the url for it
-                // Otherwise we get the url to the downloaded resource instead
-                $url = $event->getDriver()->getPublicUrl($identifier);
-                $event->setPublicUrl($url);
-            }
+            // This applies a public url for the given asset.
+            // If the file has been registered as a mdc-asset, then this returns the url for it
+            // Otherwise we get the url to the downloaded resource instead
+            $url = $event->getDriver()->getPublicUrl($file->getIdentifier());
+            $event->setPublicUrl($url);
         } catch (\InvalidArgumentException $e) {
             // todo: we should add logging in the future
         }
