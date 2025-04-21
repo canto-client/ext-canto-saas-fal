@@ -15,8 +15,10 @@ use Fairway\CantoSaasFal\Resource\Event\BeforeMdcUrlGenerationEvent;
 use Fairway\CantoSaasFal\Resource\Repository\CantoRepository;
 use Fairway\CantoSaasFal\Utility\CantoUtility;
 use TYPO3\CMS\Core\EventDispatcher\EventDispatcher;
+use TYPO3\CMS\Core\Imaging\ImageDimension;
 use TYPO3\CMS\Core\Imaging\ImageManipulation\Area;
 use TYPO3\CMS\Core\Resource\File;
+use TYPO3\CMS\Core\Resource\Processing\TaskInterface;
 
 /**
  * todo: add documentation
@@ -41,19 +43,19 @@ final class MdcUrlGenerator
         $this->eventDispatcher = $eventDispatcher;
     }
 
-    public function generateMdcUrl(File $file, array $configuration): string
+    public function generateMdcUrl(TaskInterface $task): string
     {
-        $assetId = CantoUtility::getIdFromCombinedIdentifier($file->getIdentifier());
-        $transformedConfiguration = $this->transformConfiguration($file, $configuration);
-        return $this->cantoRepository->generateMdcUrl($assetId) . $this->addOperationToMdcUrl($transformedConfiguration);
+        $transformedConfiguration = $this->transformConfiguration($task);
+
+        return $this->cantoRepository->generateMdcUrl($task->getSourceFile()->getIdentifier()) . $this->addOperationToMdcUrl($transformedConfiguration);
     }
 
     /**
      * @return array{width: int, height: int}
      */
-    public function resolveImageWidthHeight(File $file, array $processingConfiguration): array
+    public function resolveImageWidthHeight(TaskInterface $task): array
     {
-        $configuration = $this->transformConfiguration($file, $processingConfiguration);
+        $configuration = $this->transformConfiguration($task);
         $width = min($configuration['width'], $processingConfiguration['maxWidth'] ?? PHP_INT_MAX);
         $height = min($configuration['height'], $processingConfiguration['maxHeight'] ?? PHP_INT_MAX);
         return [
@@ -110,6 +112,7 @@ final class MdcUrlGenerator
             $cropString .= ',' . (int)$croppingArea['offsetLeft'] . ',' . (int)$croppingArea['offsetTop'];
         }
         $event = new BeforeMdcUrlGenerationEvent($configuration, $scaleString, $cropString, $formatString, true);
+
         return $this->eventDispatcher->dispatch($event)->getMdcUrl();
     }
 
@@ -117,24 +120,29 @@ final class MdcUrlGenerator
      * @param array{width: ?int, height: ?int, minWidth: numeric|null, minHeight: numeric|null, maxWidth: numeric|null, maxHeight: numeric|null, crop: ?Area} $configuration
      * @return array{width: int, height: int, size?: ?int, x?: ?int, y?: ?int, format?: ?string, crop: ?Area, minWidth?: numeric|null, minHeight?: numeric|null, maxWidth?: numeric|null, maxHeight?: numeric|null}
      */
-    private function transformConfiguration(File $file, array $configuration): array
+    private function transformConfiguration(TaskInterface $task): array
     {
-        $imageDimension = $this->getMasterImageDimensions($file);
+        $configuration = $task->getConfiguration();
         if (!empty($configuration['width']) && !empty($configuration['height'])) {
             $configuration['height'] = (int)$configuration['height'];
             $configuration['width'] = (int)$configuration['width'];
+
             return $configuration;
         }
-        $configuration['height'] = $configuration['height'] ?? $configuration['maxHeight'] ?? $imageDimension['height'] ?? 0;
-        $configuration['width'] = $configuration['width'] ?? $configuration['maxWidth'] ?? $imageDimension['width'] ?? 0;
+        $imageDimensions = ImageDimension::fromProcessingTask($task);
+        $configuration['height'] = $imageDimensions->getHeight() ?: $configuration['height'];
+        $configuration['width'] = $imageDimensions->getWidth() ?: $configuration['width'];
+        $masterImageDimension = $this->getMasterImageDimensions($task->getSourceFile());
+        $configuration['height'] = $configuration['height'] ?? $configuration['maxHeight'] ?? $masterImageDimension['height'] ?? 0;
+        $configuration['width'] = $configuration['width'] ?? $configuration['maxWidth'] ?? $masterImageDimension['width'] ?? 0;
         if (($configuration['crop'] ?? null) instanceof Area) {
             $configuration['height'] = min($configuration['height'], $configuration['crop']->getHeight());
             $configuration['width'] = min($configuration['width'], $configuration['crop']->getWidth());
             $configuration['resizedCropped'] = [
-                'width' => (int)($configuration['crop']->getWidth() * $imageDimension['scale']),
-                'height' => (int)($configuration['crop']->getHeight() * $imageDimension['scale']),
-                'offsetLeft' => (int)($configuration['crop']->getOffsetLeft() * $imageDimension['scale']),
-                'offsetTop' => (int)($configuration['crop']->getOffsetTop() * $imageDimension['scale']),
+                'width' => (int)($configuration['crop']->getWidth() * $masterImageDimension['scale']),
+                'height' => (int)($configuration['crop']->getHeight() * $masterImageDimension['scale']),
+                'offsetLeft' => (int)($configuration['crop']->getOffsetLeft() * $masterImageDimension['scale']),
+                'offsetTop' => (int)($configuration['crop']->getOffsetTop() * $masterImageDimension['scale']),
             ];
         }
         $configuration['height'] = (int)$configuration['height'];
@@ -145,6 +153,7 @@ final class MdcUrlGenerator
         if (isset($configuration['fileExtension'])) {
             $configuration['format'] = strtoupper($configuration['fileExtension']);
         }
+
         return $configuration;
     }
 }
