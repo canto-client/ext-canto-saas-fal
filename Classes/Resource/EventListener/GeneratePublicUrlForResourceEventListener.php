@@ -13,16 +13,12 @@ namespace Fairway\CantoSaasFal\Resource\EventListener;
 
 use Fairway\CantoSaasFal\Resource\Driver\CantoDriver;
 use TYPO3\CMS\Core\Resource\Event\GeneratePublicUrlForResourceEvent;
-use TYPO3\CMS\Core\Resource\ProcessedFile;
 
 final class GeneratePublicUrlForResourceEventListener
 {
     public function __invoke(GeneratePublicUrlForResourceEvent $event): void
     {
         $file = $event->getResource();
-        if ($file instanceof ProcessedFile) {
-            $file = $file->getOriginalFile();
-        }
         if ($file->getStorage()->getDriverType() !== CantoDriver::DRIVER_NAME) {
             return;
         }
