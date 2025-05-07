@@ -16,6 +16,8 @@ use Fairway\CantoSaasFal\Resource\Event\MdcEnabledCheckEvent;
 use Fairway\CantoSaasFal\Resource\Repository\CantoRepository;
 use InvalidArgumentException;
 use TYPO3\CMS\Core\EventDispatcher\EventDispatcher;
+use TYPO3\CMS\Core\Http\ApplicationType;
+use TYPO3\CMS\Core\Http\ServerRequestFactory;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 class CantoUtility
@@ -82,7 +84,11 @@ class CantoUtility
         if (empty($configuration['mdcDomainName']) || empty($configuration['mdcAwsAccountId'])) {
             return false;
         }
-        $mdc = SiteConfigurationResolver::get('canto_mdc_enabled') ?? false;
+        $mdc = true;
+        $request = $GLOBALS['TYPO3_REQUEST'] ?? ServerRequestFactory::fromGlobals();
+        if (ApplicationType::fromRequest($request)->isFrontend()) {
+            $mdc = SiteConfigurationResolver::get('canto_mdc_enabled') ?? false;
+        }
         if (isset($GLOBALS['CANTO_SAAS_FAL']['OVERRIDE_MDC_IS_ENABLED'])) {
             $mdc = $GLOBALS['CANTO_SAAS_FAL']['OVERRIDE_MDC_IS_ENABLED'] ?? false;
         }
