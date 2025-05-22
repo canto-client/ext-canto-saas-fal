@@ -54,6 +54,8 @@ final class FileControlContainer extends FilesControlContainerCore
         );
         $objectPrefix = $currentStructureDomObjectIdPrefix . '-' . $foreign_table;
 
+        $hideButton = isset($inlineConfiguration['maxitems']) && count($this->data['parameterArray']['fieldConf']['children']) >= $inlineConfiguration['maxitems'];
+
         $title = 'Add file [' . $storageName . ']';
 
         $attributes = [
@@ -61,7 +63,7 @@ final class FileControlContainer extends FilesControlContainerCore
             'class' => 'btn btn-default t3js-element-browser',
             'data-mode' => 'cantosaas',
             'data-params' => '|||' . $allowed . '|' . $objectPrefix . '|' . $storageId,
-            'style' => ($inlineConfiguration['maxitems'] >= count($this->data['parameterArray']['fieldConf']['children'])) ? 'display: none;' : ''
+            'style' => $hideButton ? 'display: none;' : ''
                 . ($inlineConfiguration['inline']['inlineNewRelationButtonStyle'] ?? ''),
             'title' => $title,
         ];
